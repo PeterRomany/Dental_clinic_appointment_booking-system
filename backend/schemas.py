@@ -25,6 +25,12 @@ class AppointmentStatusUpdate(BaseModel):
     status: STATUS_VALUES
 
 
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+
+
 class AppointmentResponse(BaseModel):
     id: int
     patient_id: int

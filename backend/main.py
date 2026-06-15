@@ -1,19 +1,29 @@
 import datetime
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import engine, get_db, Base
-from models import Patient, Appointment
+from models import Patient, Appointment, User
 from schemas import (
     AppointmentCreate,
     AppointmentUpdate,
     AppointmentResponse,
     AppointmentStatusUpdate,
+    TokenResponse,
+)
+from auth import (
+    verify_password,
+    create_access_token,
+    get_current_user,
+    seed_default_users,
+    hash_password,
 )
 
 Base.metadata.create_all(bind=engine)
+seed_default_users()
 
 app = FastAPI(title="عيادة الأسنان - نظام إدارة المواعيد")
 
@@ -80,6 +90,38 @@ def health():
 
 
 # ---------------------------------------------------------------------------
+# POST /api/login
+# ---------------------------------------------------------------------------
+@app.post("/api/login", response_model=TokenResponse)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(401, "اسم المستخدم أو كلمة المرور غير صحيحة.")
+
+    token = create_access_token({"sub": user.username, "role": user.role})
+    return TokenResponse(access_token=token, role=user.role)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/setup-users  –  Re-seed default users (idempotent)
+# ---------------------------------------------------------------------------
+@app.post("/api/setup-users")
+def setup_users(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    created = []
+    if not db.query(User).filter(User.username == "doctor").first():
+        db.add(User(username="doctor", hashed_password=hash_password("adminpassword"), role="doctor"))
+        created.append("doctor")
+    if not db.query(User).filter(User.username == "assistant").first():
+        db.add(User(username="assistant", hashed_password=hash_password("assistantpassword"), role="assistant"))
+        created.append("assistant")
+    db.commit()
+    return {"created": created, "message": "انتهى."}
+
+
+# ---------------------------------------------------------------------------
 # GET /api/appointments?date=YYYY-MM-DD&from=YYYY-MM-DD&to=YYYY-MM-DD
 # ---------------------------------------------------------------------------
 @app.get("/api/appointments", response_model=list[AppointmentResponse])
@@ -88,6 +130,7 @@ def get_appointments(
     from_date: str | None = Query(None, alias="from"),
     to_date: str | None = Query(None, alias="to"),
     db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
     query = db.query(Appointment).join(Patient)
 
@@ -123,7 +166,10 @@ def get_appointments(
 # GET /api/appointments/pending
 # ---------------------------------------------------------------------------
 @app.get("/api/appointments/pending", response_model=list[AppointmentResponse])
-def get_pending_appointments(db: Session = Depends(get_db)):
+def get_pending_appointments(
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
     appointments = (
         db.query(Appointment)
         .join(Patient)
@@ -138,7 +184,13 @@ def get_pending_appointments(db: Session = Depends(get_db)):
 # GET /api/appointments/check?date=...&time=...
 # ---------------------------------------------------------------------------
 @app.get("/api/appointments/check")
-def check_slot(date: str, time: str, exclude: int | None = None, db: Session = Depends(get_db)):
+def check_slot(
+    date: str,
+    time: str,
+    exclude: int | None = None,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
     try:
         d = datetime.date.fromisoformat(date)
     except ValueError:
@@ -151,7 +203,11 @@ def check_slot(date: str, time: str, exclude: int | None = None, db: Session = D
 # POST /api/appointments
 # ---------------------------------------------------------------------------
 @app.post("/api/appointments", response_model=AppointmentResponse)
-def create_appointment(body: AppointmentCreate, db: Session = Depends(get_db)):
+def create_appointment(
+    body: AppointmentCreate,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
     _validate_date_not_past(body.appointment_date)
 
     if _is_slot_taken(db, body.appointment_date, body.appointment_time):
@@ -187,7 +243,10 @@ def create_appointment(body: AppointmentCreate, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 @app.put("/api/appointments/{appointment_id}", response_model=AppointmentResponse)
 def update_appointment(
-    appointment_id: int, body: AppointmentUpdate, db: Session = Depends(get_db)
+    appointment_id: int,
+    body: AppointmentUpdate,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
@@ -224,7 +283,10 @@ def update_appointment(
 # ---------------------------------------------------------------------------
 @app.put("/api/appointments/{appointment_id}/status", response_model=AppointmentResponse)
 def update_appointment_status(
-    appointment_id: int, body: AppointmentStatusUpdate, db: Session = Depends(get_db)
+    appointment_id: int,
+    body: AppointmentStatusUpdate,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
 ):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:

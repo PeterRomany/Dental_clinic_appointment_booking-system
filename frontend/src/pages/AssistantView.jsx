@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { PlusCircle, Stethoscope, RefreshCw, CalendarDays, AlertTriangle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { PlusCircle, Stethoscope, RefreshCw, CalendarDays, AlertTriangle, LogOut } from 'lucide-react'
 import AppointmentCard from '../components/AppointmentCard'
 import AddAppointmentModal from '../components/AddAppointmentModal'
 import EditAppointmentModal from '../components/EditAppointmentModal'
 import { getScheduleAppointments, createAppointment } from '../api/appointments'
+import { useAuth } from '../contexts/AuthContext'
 
 function dateHeader(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
@@ -22,6 +24,8 @@ function dateHeader(dateStr) {
 }
 
 export default function AssistantView() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [appointments, setAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -78,12 +82,21 @@ export default function AssistantView() {
               <p className="text-lg text-gray-500">لوحة المساعد</p>
             </div>
           </div>
-          <button
-            onClick={fetchAppointments}
-            className="p-3 bg-white rounded-full shadow hover:shadow-md transition"
-          >
-            <RefreshCw className="w-6 h-6 text-blue-500" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchAppointments}
+              className="p-3 bg-white rounded-full shadow hover:shadow-md transition"
+            >
+              <RefreshCw className="w-6 h-6 text-blue-500" />
+            </button>
+            <button
+              onClick={() => { logout(); navigate('/login') }}
+              className="p-3 bg-white rounded-full shadow hover:shadow-md transition text-red-400 hover:text-red-600"
+              title="تسجيل الخروج"
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Add Button */}

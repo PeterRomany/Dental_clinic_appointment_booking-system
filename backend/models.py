@@ -15,6 +15,15 @@ class Patient(Base):
     appointments = relationship("Appointment", back_populates="patient")
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False)  # "doctor" or "assistant"
+
+
 class Appointment(Base):
     __tablename__ = "appointments"
 

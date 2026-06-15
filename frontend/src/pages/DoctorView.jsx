@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { CalendarDays, RefreshCw, AlertCircle, CheckCircle, XCircle, Stethoscope, Frown } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarDays, RefreshCw, AlertCircle, CheckCircle, XCircle, Stethoscope, Frown, LogOut } from 'lucide-react'
 import AppointmentCard from '../components/AppointmentCard'
 import EditAppointmentModal from '../components/EditAppointmentModal'
 import { getScheduleAppointments, getPendingAppointments, updateAppointmentStatus } from '../api/appointments'
+import { useAuth } from '../contexts/AuthContext'
 
 function formatDateArabic(dateStr) {
   const d = new Date(dateStr + 'T12:00:00')
@@ -17,6 +19,8 @@ function formatDateArabic(dateStr) {
 }
 
 export default function DoctorView() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const [schedule, setSchedule] = useState([])
   const [pendingAppts, setPendingAppts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -100,9 +104,18 @@ export default function DoctorView() {
               <p className="text-lg text-gray-500">جدول المواعيد الكامل</p>
             </div>
           </div>
-          <button onClick={fetchAll} className="p-3 bg-white rounded-full shadow hover:shadow-md transition">
-            <RefreshCw className="w-6 h-6 text-indigo-500" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={fetchAll} className="p-3 bg-white rounded-full shadow hover:shadow-md transition">
+              <RefreshCw className="w-6 h-6 text-indigo-500" />
+            </button>
+            <button
+              onClick={() => { logout(); navigate('/login') }}
+              className="p-3 bg-white rounded-full shadow hover:shadow-md transition text-red-400 hover:text-red-600"
+              title="تسجيل الخروج"
+            >
+              <LogOut className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Toast */}
